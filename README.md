@@ -86,6 +86,11 @@ python -m pytest
 
 ## 3. API Documentation
 
+### 0. Watchdog Control Dashboard (Premium iOS UI)
+- **Endpoint**: `GET /`
+- **Description**: Serves the interactive, real-time web control panel (iOS 26 glassmorphism style) for managing and presenting monitors.
+- **Usage**: Open `http://127.0.0.1:8000/` in a web browser.
+
 ### 1. Register a Monitor
 - **Endpoint**: `POST /monitors`
 - **Description**: Registers a new device monitor and starts a countdown timer.

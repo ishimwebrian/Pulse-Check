@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Watchdog Sentinel — Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0b0c10;
+            --card-bg: rgba(22, 28, 45, 0.45);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --glow-color: rgba(99, 102, 241, 0.15);
+            
+            --active-color: #10b981;
+            --active-glow: rgba(16, 185, 129, 0.25);
+            
+            --paused-color: #f59e0b;
+            --paused-glow: rgba(245, 158, 11, 0.25);
+            
+            --down-color: #ef4444;
+            --down-glow: rgba(239, 68, 68, 0.35);
+            
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --font-main: 'Outfit', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-main);
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(16, 185, 129, 0.08) 0%, transparent 40%);
+            background-attachment: fixed;
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        /* Glassmorphism utility */
+        .glass-panel {
+            background: var(--card-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        /* Container */
+        .container {
+            width: 100%;
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 2rem;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        /* Header */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .pulse-indicator {
+            width: 16px;
+            height: 16px;
+            background-color: var(--active-color);
+            border-radius: 50%;
+            box-shadow: 0 0 12px var(--active-color);
+            animation: pulse-glow 2s infinite;
+        }
+
+        @keyframes pulse-glow {
+            0% { transform: scale(0.9); opacity: 0.6; box-shadow: 0 0 4px var(--active-glow); }
+            50% { transform: scale(1.1); opacity: 1; box-shadow: 0 0 16px var(--active-color); }
+            100% { transform: scale(0.9); opacity: 0.6; box-shadow: 0 0 4px var(--active-glow); }
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            font-weight: 800;
+            letter-spacing: -0.05em;
+            background: linear-gradient(135deg, #ffffff 30%, #a5b4fc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Stats grid */
+        .stats-banner {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .stat-badge {
+            padding: 0.6rem 1.2rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            border-radius: 14px;
+        }
+
+        .badge-total { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .badge-active { background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); color: var(--active-color); }
+        .badge-paused { background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.2); color: var(--paused-color); }
+        .badge-down { background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); color: var(--down-color); }
+
+        /* Main Workspace layout */
+        .main-workspace {
+            display: grid;
+            grid-template-columns: 380px 1fr;
+            gap: 2rem;
+            align-items: start;
+        }
+
+        @media (max-width: 900px) {
+            .main-workspace {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Cards and forms */
+        .panel-heading {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .register-card {
+            padding: 2rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.2rem;
+        }
+
+        label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        input {
+            width: 100%;
+            padding: 0.9rem 1.2rem;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 14px;
+            color: var(--text-primary);
+            font-family: var(--font-main);
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #6366f1;
+            background: rgba(255, 255, 255, 0.06);
+            box-shadow: 0 0 12px rgba(99, 102, 241, 0.2);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 1rem;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #ffffff;
+            background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+            border: none;
+            border-radius: 14px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(79, 70, 229, 0.4);
+            background: linear-gradient(135deg, #818cf8 0%, #4f46e5 100%);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        /* Monitor Grid */
+        .monitors-column {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .monitors-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .empty-state {
+            padding: 4rem 2rem;
+            text-align: center;
+            color: var(--text-secondary);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            stroke: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Device Card */
+        .device-card {
+            padding: 1.5rem;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            gap: 1.2rem;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            animation: card-appear 0.4s ease-out;
+        }
+
+        @keyframes card-appear {
+            from { opacity: 0; transform: translateY(15px) scale(0.97); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .device-card:hover {
+            transform: translateY(-4px) scale(1.01);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .device-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .device-title {
+            font-size: 1.35rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            color: #ffffff;
+            word-break: break-all;
+        }
+
+        .device-meta {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            font-family: var(--font-mono);
+        }
+
+        /* Status Pill */
+        .status-pill {
+            padding: 0.3rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+        }
+
+        .card-active {
+            box-shadow: inset 0 0 12px rgba(16, 185, 129, 0.05);
+        }
+        .card-active .status-pill { background: rgba(16, 185, 129, 0.15); color: var(--active-color); border: 1px solid rgba(16, 185, 129, 0.2); }
+        .card-active .status-dot { background-color: var(--active-color); box-shadow: 0 0 6px var(--active-color); }
+
+        .card-paused {
+            box-shadow: inset 0 0 12px rgba(245, 158, 11, 0.05);
+        }
+        .card-paused .status-pill { background: rgba(245, 158, 11, 0.15); color: var(--paused-color); border: 1px solid rgba(245, 158, 11, 0.2); }
+        .card-paused .status-dot { background-color: var(--paused-color); box-shadow: 0 0 6px var(--paused-color); }
+
+        .card-down {
+            box-shadow: inset 0 0 16px rgba(239, 68, 68, 0.05);
+            animation: card-alert-shake 2.5s infinite;
+        }
+        .card-down .status-pill { background: rgba(239, 68, 68, 0.15); color: var(--down-color); border: 1px solid rgba(239, 68, 68, 0.2); }
+        .card-down .status-dot { background-color: var(--down-color); box-shadow: 0 0 8px var(--down-color); animation: blink 1s infinite; }
+
+        @keyframes blink {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+
+        @keyframes card-alert-shake {
+            0%, 90%, 100% { transform: translate(0, 0); }
+            92% { transform: translate(-2px, 0); }
+            94% { transform: translate(2px, 0); }
+            96% { transform: translate(-2px, 0); }
+            98% { transform: translate(2px, 0); }
+        }
+
+        /* Countdown display */
+        .countdown-container {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .countdown-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .time-digits {
+            font-family: var(--font-mono);
+            font-size: 1.1rem;
+        }
+
+        .progress-track {
+            height: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            width: 100%;
+            border-radius: 4px;
+            transition: width 0.1s linear, background-color 0.4s ease;
+        }
+
+        /* Control Buttons */
+        .controls-row {
+            display: flex;
+            gap: 0.8rem;
+            margin-top: 0.3rem;
+        }
+
+        .btn-control {
+            flex-grow: 1;
+            padding: 0.6rem;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+            color: #ffffff;
+            transition: all 0.2s ease;
+        }
+
+        .btn-heartbeat {
+            background: rgba(16, 185, 129, 0.1);
+        }
+        .btn-heartbeat:hover:not(:disabled) {
+            background: var(--active-color);
+            box-shadow: 0 0 12px var(--active-glow);
+        }
+        .btn-heartbeat:active {
+            transform: scale(0.95);
+        }
+
+        .btn-pause {
+            background: rgba(245, 158, 11, 0.1);
+        }
+        .btn-pause:hover:not(:disabled) {
+            background: var(--paused-color);
+            box-shadow: 0 0 12px var(--paused-glow);
+        }
+
+        .btn-delete {
+            background: rgba(239, 68, 68, 0.06);
+            color: rgba(239, 68, 68, 0.8);
+        }
+        .btn-delete:hover {
+            background: var(--down-color);
+            color: #ffffff;
+            box-shadow: 0 0 12px var(--down-glow);
+        }
+
+        .btn-control:disabled {
+            opacity: 0.25;
+            cursor: not-allowed;
+        }
+
+        /* Pulse animation class */
+        .pulse-animation {
+            animation: pulse-burst 0.5s cubic-bezier(0, 0, 0.2, 1);
+        }
+
+        @keyframes pulse-burst {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.04); box-shadow: 0 0 24px rgba(16, 185, 129, 0.4); }
+            100% { transform: scale(1); }
+        }
+
+        /* Web Console Panel */
+        .console-panel {
+            padding: 1.5rem;
+            margin-top: auto;
+        }
+
+        .console-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            padding-bottom: 0.6rem;
+            margin-bottom: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .console-output {
+            max-height: 140px;
+            overflow-y: auto;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+
+        .console-line {
+            line-height: 1.4;
+            animation: console-fade 0.3s ease-out;
+        }
+
+        @keyframes console-fade {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .line-info { color: #818cf8; }
+        .line-alert { color: var(--down-color); font-weight: 600; }
+        .line-success { color: var(--active-color); }
+
+        /* Scrollbar styles */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.15);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Toast notifications */
+        .toast-container {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+        }
+
+        .toast {
+            padding: 1rem 1.5rem;
+            border-radius: 16px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            animation: toast-slide 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes toast-slide {
+            from { transform: translateY(50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .toast-success { background: rgba(16, 185, 129, 0.95); color: #ffffff; border: 1px solid rgba(16, 185, 129, 0.2); }
+        .toast-error { background: rgba(239, 68, 68, 0.95); color: #ffffff; border: 1px solid rgba(239, 68, 68, 0.2); }
+        .toast-info { background: rgba(99, 102, 241, 0.95); color: #ffffff; border: 1px solid rgba(99, 102, 241, 0.2); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header Section -->
+        <header>
+            <div class="logo-area">
+                <div class="pulse-indicator"></div>
+                <div>
+                    <h1>Watchdog Sentinel</h1>
+                    <div style="font-size: 0.8rem; color: var(--text-secondary); letter-spacing: 0.05em; text-transform: uppercase; margin-top: 2px;">Pulse Check API • iOS 26 Design</div>
+                </div>
+            </div>
+            
+            <div class="stats-banner">
+                <div class="stat-badge badge-total" id="stat-total">Total: 0</div>
+                <div class="stat-badge badge-active" id="stat-active">Active: 0</div>
+                <div class="stat-badge badge-paused" id="stat-paused">Paused: 0</div>
+                <div class="stat-badge badge-down" id="stat-down">Down: 0</div>
+            </div>
+        </header>
+
+        <!-- Main Workspace -->
+        <div class="main-workspace">
+            <!-- Left Side: Registration card -->
+            <div class="glass-panel register-card">
+                <div class="panel-heading">
+                    <span>Register Watchdog</span>
+                    <span style="font-size: 1.25rem;">📡</span>
+                </div>
+                
+                <form id="register-form">
+                    <div class="form-group">
+                        <label for="device-id">Device ID</label>
+                        <input type="text" id="device-id" placeholder="e.g. solar-farm-01" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="device-timeout">Timeout (seconds)</label>
+                        <input type="number" id="device-timeout" placeholder="e.g. 60" min="5" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="device-email">Alert Email</label>
+                        <input type="email" id="device-email" placeholder="e.g. engineer@critmon.com" required>
+                    </div>
+                    
+                    <button type="submit" class="btn" style="margin-top: 1rem;">
+                        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                        Deploy Watchdog
+                    </button>
+                </form>
+            </div>
+
+            <!-- Right Side: Monitors Live Grid -->
+            <div class="monitors-column">
+                <div class="glass-panel" style="padding: 1.5rem; flex-grow: 1; display: flex; flex-direction: column; min-height: 400px;">
+                    <div class="panel-heading">
+                        <span>Live Devices Grid</span>
+                        <span style="font-size: 0.85rem; color: var(--text-secondary); font-weight: normal;" id="sync-indicator">Synchronized</span>
+                    </div>
+
+                    <!-- Grid List -->
+                    <div class="monitors-grid" id="monitors-container">
+                        <!-- Card dynamic generation goes here -->
+                    </div>
+
+                    <!-- Empty state -->
+                    <div class="empty-state" id="empty-state-view">
+                        <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.374 21c-.89 0-1.64-.693-1.745-1.579L7.12 14.542m9.505 6.458c.89 0 1.64-.693 1.745-1.579l.509-4.28m-10.957-3.957a4.935 4.935 0 0 0 4.195 2.148 4.935 4.935 0 0 0 4.195-2.148M8.25 10.5h7.5M12 3v1m0 16v1m9-9h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 1 1 7.072-7.072l.53.53m-1.282 3.536l.707.707"/>
+                        </svg>
+                        <p style="font-weight: 600;">No Active Sentinels</p>
+                        <p style="font-size: 0.85rem;">Register a device on the left to start real-time tracking.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Simulated Web Console Panel -->
+        <div class="glass-panel console-panel">
+            <div class="console-header">
+                <span>Watchdog Sentinel Alert Logs</span>
+                <span id="clear-console" style="cursor: pointer; text-decoration: underline; font-size: 0.75rem;">Clear Log</span>
+            </div>
+            <div class="console-output" id="console-output">
+                <div class="console-line line-info">[INFO] Sentinel API Loaded. Ready for heartbeats...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast elements -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- UI Core Logic Script -->
+    <script>
+        const API_BASE = ""; // Relative to server
+        let localMonitors = [];
+        let expiredTrackSet = new Set(); // Tracks already alerted devices to prevent duplicate console alerts
+
+        // DOM elements
+        const container = document.getElementById("monitors-container");
+        const emptyState = document.getElementById("empty-state-view");
+        const registerForm = document.getElementById("register-form");
+        const consoleOutput = document.getElementById("console-output");
+        const clearConsoleBtn = document.getElementById("clear-console");
+        const toastContainer = document.getElementById("toast-container");
+
+        // Stat elements
+        const statTotal = document.getElementById("stat-total");
+        const statActive = document.getElementById("stat-active");
+        const statPaused = document.getElementById("stat-paused");
+        const statDown = document.getElementById("stat-down");
+
+        // Helper to print simulation logs
+        function logToConsole(message, type = "info") {
+            const line = document.createElement("div");
+            line.className = `console-line line-${type}`;
+            const time = new Date().toLocaleTimeString();
+            line.innerText = `[${time}] ${message}`;
+            consoleOutput.appendChild(line);
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        }
+
+        // Show Toast Notifications
+        function showToast(message, type = "info") {
+            const toast = document.createElement("div");
+            toast.className = `toast toast-${type}`;
+            
+            let icon = "🔔";
+            if (type === "success") icon = "🟢";
+            if (type === "error") icon = "🔴";
+            
+            toast.innerHTML = `<span>${icon}</span> <span>${message}</span>`;
+            toastContainer.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.opacity = "0";
+                toast.style.transform = "translateY(20px)";
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // Fetch monitors from API
+        async function fetchMonitors() {
+            try {
+                const res = await fetch(`${API_BASE}/monitors`);
+                if (!res.ok) throw new Error("Sync failed");
+                const data = await res.json();
+                
+                // Update local list
+                localMonitors = data;
+                updateStats();
+                renderGrid();
+                
+                // Sync notification
+                const indicator = document.getElementById("sync-indicator");
+                indicator.innerText = "Synchronized";
+                indicator.style.color = "var(--active-color)";
+                
+            } catch (err) {
+                const indicator = document.getElementById("sync-indicator");
+                indicator.innerText = "Connection Error";
+                indicator.style.color = "var(--down-color)";
+            }
+        }
+
+        // Stats Calculator
+        function updateStats() {
+            const total = localMonitors.length;
+            const active = localMonitors.filter(m => m.status === "active").length;
+            const paused = localMonitors.filter(m => m.status === "paused").length;
+            const down = localMonitors.filter(m => m.status === "down").length;
+
+            statTotal.innerText = `Total: ${total}`;
+            statActive.innerText = `Active: ${active}`;
+            statPaused.innerText = `Paused: ${paused}`;
+            statDown.innerText = `Down: ${down}`;
+        }
+
+        // Render monitors grid
+        function renderGrid() {
+            if (localMonitors.length === 0) {
+                emptyState.style.display = "flex";
+                container.style.display = "none";
+                return;
+            }
+
+            emptyState.style.display = "none";
+            container.style.display = "grid";
+
+            // Update or generate cards
+            localMonitors.forEach(monitor => {
+                let card = document.getElementById(`card-${monitor.id}`);
+                
+                // If card does not exist, create it
+                if (!card) {
+                    card = document.createElement("div");
+                    card.id = `card-${monitor.id}`;
+                    card.className = "glass-panel device-card";
+                    container.appendChild(card);
+                }
+
+                // Check alert triggers (local logging simulator)
+                if (monitor.status === "down" && !expiredTrackSet.has(monitor.id)) {
+                    expiredTrackSet.add(monitor.id);
+                    const alertObj = {
+                        ALERT: `Device ${monitor.id} is down!`,
+                        time: new Date().toISOString()
+                    };
+                    logToConsole(JSON.stringify(alertObj), "alert");
+                    showToast(`Alert: Device '${monitor.id}' went offline!`, "error");
+                } else if (monitor.status !== "down" && expiredTrackSet.has(monitor.id)) {
+                    // Recovered
+                    expiredTrackSet.delete(monitor.id);
+                    logToConsole(`[RECOVERY] Device ${monitor.id} back online.`, "success");
+                    showToast(`Device '${monitor.id}' has recovered!`, "success");
+                }
+
+                // Update classes based on status
+                card.className = `glass-panel device-card card-${monitor.status}`;
+
+                // Calculate progress percentages
+                const percentage = monitor.status === "active" 
+                    ? (monitor.remaining_seconds / monitor.timeout) * 100 
+                    : (monitor.status === "paused" ? 100 : 0);
+
+                let progressColor = "var(--active-color)";
+                if (percentage < 20) progressColor = "var(--down-color)";
+                else if (percentage < 50) progressColor = "var(--paused-color)";
+
+                // Last Heartbeat Formatter
+                const lastHbStr = monitor.last_heartbeat 
+                    ? new Date(monitor.last_heartbeat).toLocaleTimeString() 
+                    : "Never";
+
+                card.innerHTML = `
+                    <div class="device-header">
+                        <div>
+                            <div class="device-title">${monitor.id}</div>
+                            <div class="device-meta">Pings: ${monitor.heartbeat_count} • Last: ${lastHbStr}</div>
+                        </div>
+                        <div class="status-pill">
+                            <span class="status-dot"></span>
+                            <span>${monitor.status}</span>
+                        </div>
+                    </div>
+                    
+                    <div style="font-size: 0.8rem; color: var(--text-secondary); word-break: break-all;">
+                        📧 ${monitor.alert_email}
+                    </div>
+
+                    <div class="countdown-container">
+                        <div class="countdown-info">
+                            <span>Watchdog Window</span>
+                            <span class="time-digits" style="color: ${progressColor}">
+                                ${monitor.status === 'active' ? monitor.remaining_seconds.toFixed(1) + 's' : (monitor.status === 'paused' ? 'Paused' : 'Expired')}
+                            </span>
+                        </div>
+                        <div class="progress-track">
+                            <div class="progress-bar" style="width: ${percentage}%; background-color: ${progressColor}"></div>
+                        </div>
+                    </div>
+
+                    <div class="controls-row">
+                        <button class="btn-control btn-heartbeat" onclick="triggerHeartbeat('${monitor.id}')" ${monitor.status === 'down' ? 'disabled' : ''} title="Send Heartbeat Ping">
+                            ⚡ Heartbeat
+                        </button>
+                        <button class="btn-control btn-pause" onclick="triggerPause('${monitor.id}')" ${monitor.status === 'down' ? 'disabled' : ''} title="Pause Sentinel">
+                            ${monitor.status === 'paused' ? '▶ Resume' : '⏸ Pause'}
+                        </button>
+                        <button class="btn-control btn-delete" onclick="triggerDelete('${monitor.id}')" title="Delete Sentinel">
+                            🗑️
+                        </button>
+                    </div>
+                `;
+            });
+
+            // Remove cards of monitors that were deleted
+            const currentIds = new Set(localMonitors.map(m => m.id));
+            const cardElements = container.querySelectorAll(".device-card");
+            cardElements.forEach(card => {
+                const id = card.id.replace("card-", "");
+                if (!currentIds.has(id)) {
+                    card.style.opacity = "0";
+                    card.style.transform = "scale(0.8)";
+                    setTimeout(() => card.remove(), 400);
+                }
+            });
+        }
+
+        // Form Submit (Register)
+        registerForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const id = document.getElementById("device-id").value.trim();
+            const timeout = parseInt(document.getElementById("device-timeout").value);
+            const email = document.getElementById("device-email").value.trim();
+
+            try {
+                const res = await fetch(`${API_BASE}/monitors`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ id, timeout, alert_email: email })
+                });
+
+                if (!res.ok) {
+                    const errData = await res.json();
+                    throw new Error(errData.detail || "Registration failed");
+                }
+
+                showToast(`Sentinel deployed for device '${id}'!`, "success");
+                logToConsole(`[REGISTER] Sentinel registered: ${id} (timeout: ${timeout}s, email: ${email})`, "success");
+                registerForm.reset();
+                fetchMonitors();
+            } catch (err) {
+                showToast(err.message, "error");
+            }
+        });
+
+        // Trigger Heartbeat
+        async function triggerHeartbeat(id) {
+            const card = document.getElementById(`card-${id}`);
+            if (card) {
+                card.classList.add("pulse-animation");
+                setTimeout(() => card.classList.remove("pulse-animation"), 500);
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/monitors/${id}/heartbeat`, { method: "POST" });
+                if (!res.ok) {
+                    const errData = await res.json();
+                    throw new Error(errData.detail || "Heartbeat failed");
+                }
+                showToast(`Heartbeat received from '${id}'`, "success");
+                logToConsole(`[PING] Heartbeat received from: ${id}`, "info");
+                fetchMonitors();
+            } catch (err) {
+                showToast(err.message, "error");
+            }
+        }
+
+        // Trigger Pause
+        async function triggerPause(id) {
+            // Find current status
+            const monitor = localMonitors.find(m => m.id === id);
+            if (!monitor) return;
+
+            const isPaused = monitor.status === "paused";
+            const endpoint = isPaused ? "heartbeat" : "pause"; // Resuming is done via heartbeat endpoint
+
+            try {
+                const res = await fetch(`${API_BASE}/monitors/${id}/${endpoint}`, { method: "POST" });
+                if (!res.ok) {
+                    const errData = await res.json();
+                    throw new Error(errData.detail || "Action failed");
+                }
+                const actionWord = isPaused ? "Resumed" : "Paused";
+                const badgeType = isPaused ? "success" : "info";
+                showToast(`Device '${id}' ${actionWord}`, badgeType);
+                logToConsole(`[STATE CHANGE] Device '${id}' marked as ${actionWord.toUpperCase()}`, "info");
+                fetchMonitors();
+            } catch (err) {
+                showToast(err.message, "error");
+            }
+        }
+
+        // Trigger Delete
+        async function triggerDelete(id) {
+            if (!confirm(`Are you sure you want to unregister and delete sentinel '${id}'?`)) return;
+
+            try {
+                const res = await fetch(`${API_BASE}/monitors/${id}`, { method: "DELETE" });
+                if (!res.ok) throw new Error("Delete failed");
+                
+                showToast(`Sentinel for '${id}' deleted.`, "info");
+                logToConsole(`[DELETE] Sentinel removed: ${id}`, "info");
+                expiredTrackSet.delete(id);
+                fetchMonitors();
+            } catch (err) {
+                showToast(err.message, "error");
+            }
+        }
+
+        // Clear console
+        clearConsoleBtn.addEventListener("click", () => {
+            consoleOutput.innerHTML = "";
+            logToConsole("Console logs cleared.", "info");
+        });
+
+        // 100ms UI ticker loop for smooth countdown progression
+        setInterval(() => {
+            let updated = false;
+            localMonitors.forEach(monitor => {
+                if (monitor.status === "active" && monitor.remaining_seconds > 0) {
+                    monitor.remaining_seconds = Math.max(0.0, monitor.remaining_seconds - 0.1);
+                    
+                    // If countdown hit exactly zero, immediately set status to down (until next poll verifies)
+                    if (monitor.remaining_seconds === 0) {
+                        monitor.status = "down";
+                    }
+                    updated = true;
+                }
+            });
+            if (updated) {
+                renderGrid();
+                updateStats();
+            }
+        }, 100);
+
+        // Fetch monitors every 1 second
+        setInterval(fetchMonitors, 1000);
+
+        // Initial fetch
+        fetchMonitors();
+    </script>
+</body>
+</html>
