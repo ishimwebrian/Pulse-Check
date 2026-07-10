@@ -734,6 +734,46 @@
                     card = document.createElement("div");
                     card.id = `card-${monitor.id}`;
                     card.className = "glass-panel device-card";
+                    
+                    // Set up the static skeleton
+                    card.innerHTML = `
+                        <div class="device-header">
+                            <div>
+                                <div class="device-title">${monitor.id}</div>
+                                <div class="device-meta" id="meta-${monitor.id}"></div>
+                            </div>
+                            <div class="status-pill" id="pill-${monitor.id}">
+                                <span class="status-dot"></span>
+                                <span class="status-text"></span>
+                            </div>
+                        </div>
+                        
+                        <div style="font-size: 0.8rem; color: var(--text-secondary); word-break: break-all;">
+                            📧 ${monitor.alert_email}
+                        </div>
+
+                        <div class="countdown-container">
+                            <div class="countdown-info">
+                                <span>Watchdog Window</span>
+                                <span class="time-digits" id="time-${monitor.id}"></span>
+                            </div>
+                            <div class="progress-track">
+                                <div class="progress-bar" id="bar-${monitor.id}"></div>
+                            </div>
+                        </div>
+
+                        <div class="controls-row">
+                            <button class="btn-control btn-heartbeat" id="btn-hb-${monitor.id}" onclick="triggerHeartbeat('${monitor.id}')" title="Send Heartbeat Ping">
+                                ⚡ Heartbeat
+                            </button>
+                            <button class="btn-control btn-pause" id="btn-pause-${monitor.id}" onclick="triggerPause('${monitor.id}')" title="Pause Sentinel">
+                                ⏸ Pause
+                            </button>
+                            <button class="btn-control btn-delete" onclick="triggerDelete('${monitor.id}')" title="Delete Sentinel">
+                                🗑️
+                            </button>
+                        </div>
+                    `;
                     container.appendChild(card);
                 }
 
@@ -770,46 +810,28 @@
                     ? new Date(monitor.last_heartbeat).toLocaleTimeString() 
                     : "Never";
 
-                card.innerHTML = `
-                    <div class="device-header">
-                        <div>
-                            <div class="device-title">${monitor.id}</div>
-                            <div class="device-meta">Pings: ${monitor.heartbeat_count} • Last: ${lastHbStr}</div>
-                        </div>
-                        <div class="status-pill">
-                            <span class="status-dot"></span>
-                            <span>${monitor.status}</span>
-                        </div>
-                    </div>
-                    
-                    <div style="font-size: 0.8rem; color: var(--text-secondary); word-break: break-all;">
-                        📧 ${monitor.alert_email}
-                    </div>
+                // Update in-place to avoid recreation (fixes button flickering/blinking)
+                document.getElementById(`meta-${monitor.id}`).innerText = `Pings: ${monitor.heartbeat_count} • Last: ${lastHbStr}`;
+                
+                const pill = document.getElementById(`pill-${monitor.id}`);
+                pill.querySelector(".status-text").innerText = monitor.status;
 
-                    <div class="countdown-container">
-                        <div class="countdown-info">
-                            <span>Watchdog Window</span>
-                            <span class="time-digits" style="color: ${progressColor}">
-                                ${monitor.status === 'active' ? monitor.remaining_seconds.toFixed(1) + 's' : (monitor.status === 'paused' ? 'Paused' : 'Expired')}
-                            </span>
-                        </div>
-                        <div class="progress-track">
-                            <div class="progress-bar" style="width: ${percentage}%; background-color: ${progressColor}"></div>
-                        </div>
-                    </div>
+                const timeDigits = document.getElementById(`time-${monitor.id}`);
+                timeDigits.innerText = monitor.status === 'active' 
+                    ? monitor.remaining_seconds.toFixed(1) + 's' 
+                    : (monitor.status === 'paused' ? 'Paused' : 'Expired');
+                timeDigits.style.color = progressColor;
 
-                    <div class="controls-row">
-                        <button class="btn-control btn-heartbeat" onclick="triggerHeartbeat('${monitor.id}')" ${monitor.status === 'down' ? 'disabled' : ''} title="Send Heartbeat Ping">
-                            ⚡ Heartbeat
-                        </button>
-                        <button class="btn-control btn-pause" onclick="triggerPause('${monitor.id}')" ${monitor.status === 'down' ? 'disabled' : ''} title="Pause Sentinel">
-                            ${monitor.status === 'paused' ? '▶ Resume' : '⏸ Pause'}
-                        </button>
-                        <button class="btn-control btn-delete" onclick="triggerDelete('${monitor.id}')" title="Delete Sentinel">
-                            🗑️
-                        </button>
-                    </div>
-                `;
+                const progressBar = document.getElementById(`bar-${monitor.id}`);
+                progressBar.style.width = percentage + '%';
+                progressBar.style.backgroundColor = progressColor;
+
+                const hbBtn = document.getElementById(`btn-hb-${monitor.id}`);
+                const pauseBtn = document.getElementById(`btn-pause-${monitor.id}`);
+                
+                hbBtn.disabled = monitor.status === 'down';
+                pauseBtn.disabled = monitor.status === 'down';
+                pauseBtn.innerHTML = monitor.status === 'paused' ? '▶ Resume' : '⏸ Pause';
             });
 
             // Remove cards of monitors that were deleted
